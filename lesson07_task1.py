@@ -50,9 +50,9 @@ class TestCalculatorWithPageObject:
             .set_delay(45) \
             .click_button("7") \
             .click_button("+") \
-            .click_button("8") \
+            .click_button("7") \
             .click_button("=") \
-            .wait_for_result("15")
+            .wait_for_result("14")
         
         result = calculator_page.get_result()
         assert result == "15", f"Ожидаемый результат: 15, фактический результат: {result}"
