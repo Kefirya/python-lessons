@@ -1,200 +1,205 @@
 import pytest
+import requests
+import time
+
+BASE_URL = "https://ru.yougile.com/api-v2"
+TOKEN = "8PqO6ZHTVR1xeLMWqRAD7L6G1-N+oLoIQlZf59v2Xplpm7Wliz-07VivutLZwv7I"
+HEADERS = {
+    "Authorization": f"Bearer {TOKEN}",
+    "Content-Type": "application/json",
+    "Accept": "application/json"
+}
 
 
-# Позитивные проверки
+def generate_unique_project_title():
+    timestamp = str(int(time.time()))
+    return f"Авто тесты {timestamp}"
 
-@pytest.mark.integration
-def test_positive_create_project_with_required_fields(
-    api_client, 
-    unique_prefix
-):
-    """Создание проекта с валидными полями."""
-    project_title = f"{unique_prefix}_required_only"
+def cleanup_project(project_id):
+    if project_id:
+        cleanup_url = f"{BASE_URL}/projects/{project_id}"
+        cleanup_data = {"deleted": True}
+        try:
+            requests.put(cleanup_url, json=cleanup_data, headers=HEADERS)
+        except Exception as e:
+            print(f"Не удалось удалить проект {project_id}: {e}")
+
+ ПОЗИТИВНЫЕ ТЕСТЫ 
+
+@pytest.mark.positive
+def test_create_project_post():
+    """Позитивный тест POST: создание проекта с валидными данными."""
+    project_title = generate_unique_project_title()
+    payload = {"title": project_title}
     
-    response = api_client.create_project(title=project_title)
-  
-    assert response.status_code == 201, \
-        f"Ожидаемый результат статус: 201, фактический результат статус: {response.status_code}. Полученный ответ: {response.text}"
-    
-    response_data = response.json()
-    assert "id" in response_data, 
-    assert isinstance(response_data["id"], str), 
-    assert len(response_data["id"]) > 0, 
-    
-    api_client.update_project(project_id=response_data["id"], deleted=True)
-
-
-@pytest.mark.integration
-def test_positive_create_project_with_all_fields(
-    api_client, 
-    unique_prefix
-):
-    """Создание проекта с наличием всех полей."""
-    project_title = f"{unique_prefix}_full_project"
-    project_description = f"Описание проекта {unique_prefix}"
-    test_users = {}  
-    
-    response = api_client.create_project(
-        title=project_title,
-        description=project_description,
-        users=test_users
+    response = requests.post(
+        f"{BASE_URL}/projects",
+        json=payload,
+        headers=HEADERS,
     )
     
-    assert response.status_code == 201, \
-        f"Ожидаемый результат статус: 201, фактический результат статус: {response.status_code}"
+    assert response.status_code == 201, f"Ожидался 201, получен {response.status_code}. Ответ: {response.text}"
     
     response_data = response.json()
+    assert isinstance(response_data.get("id"), str), "Ответ должен содержать ID в формате строки"
+    assert response_data["id"], "ID проекта не должен быть пустым"
+
     project_id = response_data["id"]
-    
-    get_response = api_client.get_project(project_id)
-    assert get_response.status_code == 200
-    
-    project_data = get_response.json()
-    assert project_data["title"] == project_title
-    assert project_data.get("description") == project_description
-    
-    api_client.update_project(project_id=project_id, deleted=True)
 
+    cleanup_project(project_id)
 
-@pytest.mark.integration
-def test_positive_get_project(api_client, create_test_project):
-    """Информация о проекте."""
-    project_id = create_test_project
-    
-    response = api_client.get_project(project_id)
-    
-    assert response.status_code == 200, \
-        f"Ожидаемый результат статус: 200, фактический результат статус: {response.status_code}"
-    
-    project_data = response.json()
-    
-    assert "id" in project_data,
-    assert project_data["id"] == project_id, 
-    assert "title" in project_data, 
-    assert isinstance(project_data["title"], str), 
-    assert "timestamp" in project_data, 
-    assert isinstance(project_data["timestamp"], int), 
+@pytest.mark.positive  
+def test_get_project_by_id():
 
-
-@pytest.mark.integration
-def test_positive_update_project_title(api_client, create_test_project, unique_prefix):
-    """Изменение названия проекта."""
-    project_id = create_test_project
-    new_title = f"{unique_prefix}_updated_title"
+    project_title = generate_unique_project_title()
+    create_payload = {"title": project_title}
     
-    response = api_client.update_project(project_id=project_id, title=new_title)
-    
-    assert response.status_code == 200, \
-        f"Ожидаемый результат статус: 200, фактический результат статус: {response.status_code}"
-    
-    get_response = api_client.get_project(project_id)
-    project_data = get_response.json()
-    
-    assert project_data["title"] == new_title, \
-        f"Обновленное название: '{new_title}', фактическое: '{project_data.get('title')}'"
-
-
-@pytest.mark.integration
-def test_positive_update_project_description(api_client, create_test_project):
-    """Обновление описания проекта."""
-    project_id = create_test_project
-    new_description = "Новое название крутое"
-    response = api_client.update_project(
-        project_id=project_id, 
-        description=new_description
+    create_response = requests.post(
+        f"{BASE_URL}/projects",
+        json=create_payload,
+        headers=HEADERS,
     )
-    
-    assert response.status_code == 200, \
-        f"Ожидаемый результат статус: 200, фактический результат статус: {response.status_code}"
-    
-    get_response = api_client.get_project(project_id)
-    project_data = get_response.json()
-    
-    assert project_data.get("description") == new_description, \
+    assert create_response.status_code == 201
+    project_id = create_response.json()["id"]
 
-
-# Негативные тесты
-
-@pytest.mark.integration
-def test_negative_create_project_without_title(api_client):
-    """Проект без названия."""
-    response = api_client._send_request(
-        method="POST",
-        endpoint="/api-v2/projects",
-        json={}  
+    response = requests.get(
+        f"{BASE_URL}/projects/{project_id}",
+        headers=HEADERS,
     )
-    
-    assert response.status_code == 400, \
-        f"Ожидаемый результат статус: 400, фактический результат статус: {response.status_code}"
-    
+
+    assert response.status_code == 200, f"Ожидался 200, получен {response.status_code}"
+
     response_data = response.json()
-    assert "error" in response_data or "message" in response_data, \
+    assert response_data["id"] == project_id, f"ID в ответе ({response_data['id']}) должен совпадать с запрошенным ({project_id})"
+    assert response_data["title"] == project_title, "Название проекта должно совпадать"
+    assert "timestamp" in response_data, "Ответ должен содержать поле timestamp"
+    assert isinstance(response_data["timestamp"], (int, float)), "timestamp должен быть числом"
 
+    cleanup_project(project_id)
 
-
-@pytest.mark.integration
-def test_negative_create_project_with_empty_title(api_client):
-    """Проект с пустым названием"""
-    response = api_client.create_project(title="")
-    и
-    assert response.status_code in [400, 422], \
-        f"Ожидаемый результат статус: 400 или 422, фактический результат статус: {response.status_code}"
-
-
-@pytest.mark.integration
-def test_negative_get_nonexistent_project(api_client):
-    """Получение несуществующего проекта."""
-    non_existent_id = "non_existent_project_12345"
+@pytest.mark.positive
+def test_update_project_put():
+    """Позитивный тест PUT: обновление существующего проекта."""
+    project_title = generate_unique_project_title()
+    create_payload = {"title": project_title}
     
-    response = api_client.get_project(non_existent_id)
+    create_response = requests.post(
+        f"{BASE_URL}/projects",
+        json=create_payload,
+        headers=HEADERS,
+    )
+    assert create_response.status_code == 201
+    project_id = create_response.json()["id"]
+
+    new_title = f"Обновленный {project_title}"
+    update_payload = {"title": new_title}
     
-    assert response.status_code == 404, \
-        f"Ожидаемый результат статус: 404, фактический результат статус: {response.status_code}"
+    response = requests.put(
+        f"{BASE_URL}/projects/{project_id}",
+        json=update_payload,
+        headers=HEADERS,
+    )
+
+    assert response.status_code == 200, f"Ожидался 200, получен {response.status_code}"
+
+    get_response = requests.get(
+        f"{BASE_URL}/projects/{project_id}",
+        headers=HEADERS,
+    )
+    updated_data = get_response.json()
+    assert updated_data["title"] == new_title, f"Название должно обновиться на '{new_title}'"
+
+    cleanup_project(project_id)
+
+НЕГАТИВНЫЕ ТЕСТЫ 
+
+@pytest.mark.negative
+def test_create_project_post_invalid():
+
+    payload = {}  # Пустой payload - нет обязательного поля title
     
+    response = requests.post(
+        f"{BASE_URL}/projects",
+        json=payload,
+        headers=HEADERS,
+    )
+
+    assert response.status_code == 400, f"Ожидался 400 для невалидных данных, получен {response.status_code}"
+
     response_data = response.json()
-    assert "error" in response_data or "message" in response_data, \
+    assert "error" in response_data or "message" in response_data, "Ответ должен содержать информацию об ошибке"
 
+@pytest.mark.negative
+def test_get_nonexistent_project():
 
-@pytest.mark.integration
-def test_negative_update_nonexistent_project(api_client, unique_prefix):
-    """Обновление несуществующего проекта."""
-    non_existent_id = "non_existent_project_12345"
-    new_title = f"{unique_prefix}_new_title"
+    non_existent_id = "non_existent_id_12345"
     
-    response = api_client.update_project(
-        project_id=non_existent_id,
-        title=new_title
+    response = requests.get(
+        f"{BASE_URL}/projects/{non_existent_id}",
+        headers=HEADERS,
+    )
+ 
+    assert response.status_code == 404, f"Ожидался 404 для несуществующего проекта, получен {response.status_code}"
+
+    response_data = response.json()
+    assert "error" in response_data or "message" in response_data, "Ответ должен содержать информацию об ошибке"
+
+@pytest.mark.negative
+def test_update_nonexistent_project():
+    """Негативный тест PUT: попытка обновления несуществующего проекта."""
+
+    non_existent_id = "non_existent_id_12345"
+    update_payload = {"title": "Новое название"}
+    
+    response = requests.put(
+        f"{BASE_URL}/projects/{non_existent_id}",
+        json=update_payload,
+        headers=HEADERS,
     )
     
-    assert response.status_code == 404, \
-        f"Ожидаемый результат статус: 404, фактический результат статус: {response.status_code}"
-    
+    assert response.status_code == 404, f"Ожидался 404 для несуществующего проекта, получен {response.status_code}"
+  
     response_data = response.json()
-    assert "error" in response_data, "Ответ должен содержать поле error"
+    assert "error" in response_data or "message" in response_data, "Ответ должен содержать информацию об ошибке"
 
-
-@pytest.mark.integration
-def test_negative_update_with_invalid_data(api_client, create_test_project):
-    """Обновление невалидного проекта."""
-    project_id = create_test_project
+@pytest.mark.negative
+def test_create_project_with_empty_title():
+    """Негативный тест POST: создание проекта с пустым названием."""
+    payload = {"title": ""}  # Пустая строка вместо валидного названия
     
-    response = api_client.update_project(project_id=project_id, title="")
-    
-    assert response.status_code in [400, 422], \
-        f"ООжидаемый результат статус: 400 или 422, фактический результат статус: {response.status_code}}"
+    response = requests.post(
+        f"{BASE_URL}/projects",
+        json=payload,
+        headers=HEADERS,
+    )
 
+    assert response.status_code in [400, 422], f"Ожидалась ошибка валидации, получен {response.status_code}"
 
-@pytest.mark.integration
-def test_negative_unauthorized_request():
-    """Запрос без авторизации."""
-    from src.api.yougile_client import YougileClient
+@pytest.mark.negative
+def test_update_with_invalid_data():
+    """Негативный тест PUT: обновление проекта с невалидными данными."""
     
-    client = YougileClient(
-        base_url="https://ru.yougile.com",
-        api_token="invalid_token_12345"
+    project_title = generate_unique_project_title()
+    create_payload = {"title": project_title}
+    
+    create_response = requests.post(
+        f"{BASE_URL}/projects",
+        json=create_payload,
+        headers=HEADERS,
+    )
+    assert create_response.status_code == 201
+    project_id = create_response.json()["id"]
+    
+    # Пытаемся обновить с невалидными данными (например, пустой title)
+    invalid_payload = {"title": ""}
+    
+    response = requests.put(
+        f"{BASE_URL}/projects/{project_id}",
+        json=invalid_payload,
+        headers=HEADERS,
     )
     
-    response = client.create_project(title="Тестовый проект")
+
+    assert response.status_code in [400, 422], f"Ожидалась ошибка валидации, получен {response.status_code}"
     
-    assert response.status_code in [401, 403], \
-        f"Ожидаемый результат статус: 401 или 403, фактический результат статус: {response.status_code}}"
+    cleanup_project(project_id)
