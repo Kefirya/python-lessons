@@ -1,4 +1,3 @@
-python
 import time
 
 def generate_unique_name(base_name: str) -> str:
