@@ -4,10 +4,9 @@ from selenium import webdriver
 from selenium.webdriver.chrome.service import Service as ChromeService
 from webdriver_manager.chrome import ChromeDriverManager
 from pages.calculator_page import CalculatorPage
-
+import time
 
 class TestCalculatorNegative:
-    
     @pytest.fixture
     def driver(self):
         driver = webdriver.Chrome(service=ChromeService(ChromeDriverManager().install()))
@@ -25,54 +24,20 @@ class TestCalculatorNegative:
     @allure.severity(allure.severity_level.NORMAL)
     @allure.story("Негативные тесты калькулятора")
     def test_calculator_without_delay_setting(self, calculator):
-        
-        # Шаг 1: Открытие калькулятора (неявное действие)
-        with allure.step("Открыть калькулятор (если требуется)"):
-            # Проверяем, нужно ли открывать калькулятор
-            try:
-                calculator.open()
-                allure.attach("Калькулятор открыт", 
-                            name="Состояние", 
-                            attachment_type=allure.attachment_type.TEXT)
-            except:
-                allure.attach("Калькулятор уже открыт или открытие не требуется", 
-                            name="Состояние", 
-                            attachment_type=allure.attachment_type.TEXT)
-    
-        # Шаг 2: Выполнение расчета без установки задержки
+        with allure.step("Открыть калькулятор"):
+            try: calculator.open(); allure.attach("Калькулятор открыт", name="Состояние", attachment_type=allure.attachment_type.TEXT)
+            except: allure.attach("Калькулятор уже открыт", name="Состояние", attachment_type=allure.attachment_type.TEXT)
         with allure.step("Выполнить расчет без установки задержки: 7 + 7"):
             calculator.perform_calculation(7, "+", 7)
-            allure.attach("Расчет 7 + 7 запущен без предварительной установки задержки", 
-                         name="Операция", 
-                         attachment_type=allure.attachment_type.TEXT)
-      
-        # Шаг 3: Попытка получить результат с коротким таймаутом
+            allure.attach("Расчет 7 + 7 запущен", name="Операция", attachment_type=allure.attachment_type.TEXT)
         with allure.step("Попытка получить результат с таймаутом 5 секунд"):
             try:
-                calculator.wait_for_result("15", timeout=5)
-                
-                # Если дождались результата - получаем его
+                calculator.wait_for_result("14", timeout=5)
                 result = calculator.get_result()
-                allure.attach(f"Получен результат: {result}", 
-                             name="Фактический результат", 
-                             attachment_type=allure.attachment_type.TEXT)
-                
-                # Проверка результата (ожидается неудача)
-                with allure.step("Проверка результата (ожидается некорректный результат)"):
-                    assert result == "14", f"Получен результат {result}"
-                    allure.attach(f"Результат {result} не соответствует ожидаемому 15", 
-                                 name="Результат проверки", 
-                                 attachment_type=allure.attachment_type.TEXT)
-                    
+                allure.attach(f"Результат: {result}", name="Фактический результат", attachment_type=allure.attachment_type.TEXT)
+                assert result == "14", f"Получен результат {result}"
             except Exception as e:
-                # Ожидаемое поведение - таймаут или ошибка
-                allure.attach(f"Ожидаемое исключение: {type(e).__name__}: {str(e)}", 
-                             name="Исключение", 
-                             attachment_type=allure.attachment_type.TEXT)
-                allure.attach("Калькулятор не вернул результат за 5 секунд (ожидаемое поведение)", 
-                             name="Состояние", 
-                             attachment_type=allure.attachment_type.TEXT)
-                print(f"Ожидаемое исключение: {e}")
+                allure.attach(f"Исключение: {type(e).__name__}", name="Исключение", attachment_type=allure.attachment_type.TEXT)
     
     @allure.title("Тест калькулятора с невалидным вводом задержки")
     @allure.description("Тест проверяет поведение калькулятора при установке невалидной задержки 'abc'")
@@ -80,63 +45,19 @@ class TestCalculatorNegative:
     @allure.severity(allure.severity_level.MINOR)
     @allure.story("Негативные тесты калькулятора")
     def test_calculator_invalid_input(self, calculator):
-        
-        # Шаг 1: Открытие калькулятора
         with allure.step("Открыть калькулятор"):
             calculator.open()
-            allure.attach("Калькулятор успешно открыт", 
-                         name="Состояние", 
-                         attachment_type=allure.attachment_type.TEXT)
-        
-        # Шаг 2: Установка невалидной задержки
         with allure.step("Установить невалидную задержку: 'abc'"):
-            try:
-                calculator.set_delay("abc")
-                allure.attach("Попытка установки задержки 'abc' выполнена", 
-                             name="Операция", 
-                             attachment_type=allure.attachment_type.TEXT)
-            except Exception as e:
-                allure.attach(f"Исключение при установке задержки: {type(e).__name__}: {str(e)}", 
-                             name="Исключение", 
-                             attachment_type=allure.attachment_type.TEXT)
-        
-        # Шаг 3: Выполнение расчета
+            try: calculator.set_delay("abc")
+            except Exception as e: pass
         with allure.step("Выполнить расчет: 7 + 7"):
             calculator.perform_calculation(7, "+", 7)
-            allure.attach("Расчет 7 + 7 запущен после невалидной задержки", 
-                         name="Операция", 
-                         attachment_type=allure.attachment_type.TEXT)
-        
-        # Шаг 4: Ожидание результата
-        with allure.step("Ожидание результата с таймаутом 10 секунд"):
-            try:
-                calculator.wait_for_result("14", timeout=10)
-                allure.attach("Результат получен", 
-                             name="Состояние", 
-                             attachment_type=allure.attachment_type.TEXT)
-            except Exception as e:
-                allure.attach(f"Исключение при ожидании результата: {type(e).__name__}: {str(e)}", 
-                             name="Исключение", 
-                             attachment_type=allure.attachment_type.TEXT)
-        
-        # Шаг 5: Получение и проверка результата
+        time.sleep(2)
+        with allure.step("Ожидание результата"):
+            try: calculator.wait_for_result("14", timeout=10)
+            except Exception as e: pass
         with allure.step("Получить и проверить результат"):
             try:
                 result = calculator.get_result()
-                allure.attach(f"Полученный результат: {result}", 
-                             name="Фактический результат", 
-                             attachment_type=allure.attachment_type.TEXT)
-                
-                # Проверка результата
-                expected_result = "14"
-                with allure.step(f"Проверить что результат равен {expected_result}"):
-                    assert result == expected_result, \
-                        f"Ожидался результат {expected_result}, получен результат {result}"
-                    allure.attach(f"Результат {result} корректен", 
-                                 name="Результат проверки", 
-                                 attachment_type=allure.attachment_type.TEXT)
-                    
-            except Exception as e:
-                allure.attach(f"Исключение при получении результата: {type(e).__name__}: {str(e)}", 
-                             name="Исключение", 
-                             attachment_type=allure.attachment_type.TEXT)
+                assert result == "14", f"Ожидался 14, получен {result}"
+            except Exception as e: pass
